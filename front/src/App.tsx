@@ -12,13 +12,16 @@ import {
   LogIn,
   UserPlus,
   ShieldCheck,
+  PackageSearch,
 } from 'lucide-react';
-import {Sidebar} from './components/Sidebar';
+import {Sidebar, SidebarPage} from './components/Sidebar';
 import {KPICard} from './components/KPICard';
 import {ProductCard} from './components/ProductCard';
 import {DetailsPanel} from './components/DetailsPanel';
+import {AlertsView} from './components/AlertsView';
 import {DEFAULT_PRODUCT_IMAGE} from './constants';
 import {
+  ApiAlert,
   ApiAuthMessageResponse,
   ApiAuthUser,
   ApiCheckNowSummary,
@@ -216,6 +219,10 @@ export default function App() {
   const [deletingProduct, setDeletingProduct] = useState(false);
   const [savingEditAlert, setSavingEditAlert] = useState(false);
 
+  const [page, setPage] = useState<SidebarPage>('dashboard');
+  const [alerts, setAlerts] = useState<ApiAlert[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
@@ -227,6 +234,8 @@ export default function App() {
     setTargetPriceInput('');
     setErrorMessage(null);
     setInfoMessage(null);
+    setPage('dashboard');
+    setAlerts([]);
   }, []);
 
   const switchAuthView = (nextView: AuthView) => {
@@ -381,6 +390,26 @@ export default function App() {
       cancelled = true;
     };
   }, [authStatus, forceLoginScreen, selectedProductId]);
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated' || page !== 'alerts') return;
+    let cancelled = false;
+    const loadAlerts = async () => {
+      setAlertsLoading(true);
+      try {
+        const data = await apiRequest<ApiAlert[]>('/api/alerts');
+        if (!cancelled) setAlerts(data);
+      } catch (error) {
+        if (!cancelled) handleProtectedError(error, 'No se pudieron cargar las alertas.');
+      } finally {
+        if (!cancelled) setAlertsLoading(false);
+      }
+    };
+    void loadAlerts();
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus, page, handleProtectedError]);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -853,9 +882,33 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface">
-      <Sidebar userEmail={authUser?.email} onLogout={handleLogout} />
+      <Sidebar
+        userEmail={authUser?.email}
+        activePage={page}
+        onNavigate={setPage}
+        onLogout={handleLogout}
+      />
 
-      <main className="ml-64 mr-[400px] p-8">
+      <main className={`ml-64 p-8 ${page === 'dashboard' ? 'mr-[400px]' : 'mr-0'}`}>
+        {page === 'alerts' ? (
+          <>
+            <header className="mb-10">
+              <h2 className="font-manrope text-3xl font-extrabold text-on-surface tracking-tight mb-2">
+                Alerts History
+              </h2>
+              <p className="text-on-surface-variant font-medium">
+                Price drop notifications triggered for your tracked products.
+              </p>
+            </header>
+            {errorMessage && (
+              <div className="mb-6 rounded-xl border border-error/20 bg-error/5 text-error px-4 py-3 text-sm font-semibold">
+                {errorMessage}
+              </div>
+            )}
+            <AlertsView alerts={alerts} loading={alertsLoading} />
+          </>
+        ) : (
+        <>
         <header className="mb-10">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -982,8 +1035,20 @@ export default function App() {
               Loading products...
             </div>
           ) : products.length === 0 ? (
-            <div className="bg-surface-container-lowest rounded-2xl p-8 text-on-surface-variant font-semibold">
-              No products tracked yet. Add your first URL above.
+            <div className="bg-surface-container-lowest rounded-3xl p-12 flex flex-col items-center justify-center gap-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <PackageSearch size={32} className="text-primary" />
+              </div>
+              <div>
+                <p className="text-lg font-extrabold text-on-surface mb-1">No products tracked yet</p>
+                <p className="text-sm text-on-surface-variant font-medium">
+                  Paste a product URL above and set a target price to start monitoring.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-on-surface-variant font-semibold bg-surface-container-high px-4 py-2 rounded-full mt-2">
+                <PlusCircle size={14} className="text-primary" />
+                Add your first product to get started
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -998,6 +1063,8 @@ export default function App() {
             </div>
           )}
         </section>
+        </>
+        )}
       </main>
 
       <DetailsPanel

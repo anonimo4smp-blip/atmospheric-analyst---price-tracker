@@ -11,17 +11,21 @@ import {
 } from 'lucide-react';
 import {cn} from '../lib/utils';
 
+export type SidebarPage = 'dashboard' | 'alerts';
+
 interface SidebarProps {
   userEmail?: string | null;
+  activePage?: SidebarPage;
+  onNavigate?: (page: SidebarPage) => void;
   onLogout?: () => void;
 }
 
-export function Sidebar({userEmail, onLogout}: SidebarProps) {
-  const navItems = [
-    {icon: LayoutDashboard, label: 'Dashboard', active: true},
-    {icon: Package, label: 'Tracked Products', active: false},
-    {icon: Bell, label: 'Alerts', active: false},
-    {icon: Settings, label: 'Settings', active: false},
+export function Sidebar({userEmail, activePage = 'dashboard', onNavigate, onLogout}: SidebarProps) {
+  const navItems: {icon: React.ElementType; label: string; page: SidebarPage | null}[] = [
+    {icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard'},
+    {icon: Package, label: 'Tracked Products', page: 'dashboard'},
+    {icon: Bell, label: 'Alerts', page: 'alerts'},
+    {icon: Settings, label: 'Settings', page: null},
   ];
 
   return (
@@ -37,20 +41,27 @@ export function Sidebar({userEmail, onLogout}: SidebarProps) {
       </div>
 
       <nav className="flex-1 space-y-2">
-        {navItems.map((item) => (
-          <button
-            key={item.label}
-            className={cn(
-              'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-semibold',
-              item.active
-                ? 'bg-white text-primary shadow-sm'
-                : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface',
-            )}
-          >
-            <item.icon size={20} />
-            <span>{item.label}</span>
-          </button>
-        ))}
+        {navItems.map((item) => {
+          const isActive = item.page !== null && item.page === activePage;
+          return (
+            <button
+              key={item.label}
+              onClick={() => item.page && onNavigate?.(item.page)}
+              disabled={item.page === null}
+              className={cn(
+                'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-semibold',
+                isActive
+                  ? 'bg-white text-primary shadow-sm'
+                  : item.page === null
+                    ? 'text-on-surface-variant/40 cursor-not-allowed'
+                    : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface',
+              )}
+            >
+              <item.icon size={20} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
       </nav>
 
       <div className="mt-auto space-y-4">

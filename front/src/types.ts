@@ -72,3 +72,17 @@ export interface ApiAuthMessageResponse {
   message: string;
   debug_token: string | null;
 }
+
+export interface ApiAlert {
+  id: number;
+  product_id: number;
+  product_title: string | null;
+  product_url: string;
+  desired_price: number;
+  triggered_price: number;
+  currency: string;
+  status: string;
+  error_message: string | null;
+  triggered_at: string;
+  sent_at: string | null;
+}
