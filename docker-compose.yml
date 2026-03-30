@@ -1,0 +1,124 @@
+volumes:
+  db_storage:
+  n8n_storage:
+
+services:
+  postgres:
+    image: postgres:16
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-supersecreto}
+      - POSTGRES_DB=${APP_DB_NAME:-pricetracker}
+    volumes:
+      - db_storage:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+
+  backend:
+    build:
+      context: ./backend
+    restart: always
+    environment:
+      - APP_ENV=${APP_ENV:-dev}
+      - DATABASE_URL=postgresql+psycopg2://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-supersecreto}@postgres:5432/${APP_DB_NAME:-pricetracker}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-change-this-key}
+      - ALERT_EMAIL=${ALERT_EMAIL:-you@example.com}
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET:-change-me-super-secret}
+      - AUTH_JWT_ALGORITHM=${AUTH_JWT_ALGORITHM:-HS256}
+      - AUTH_ACCESS_TOKEN_TTL_MINUTES=${AUTH_ACCESS_TOKEN_TTL_MINUTES:-15}
+      - AUTH_REFRESH_TOKEN_TTL_DAYS=${AUTH_REFRESH_TOKEN_TTL_DAYS:-30}
+      - AUTH_EMAIL_TOKEN_TTL_HOURS=${AUTH_EMAIL_TOKEN_TTL_HOURS:-24}
+      - AUTH_PASSWORD_RESET_TTL_MINUTES=${AUTH_PASSWORD_RESET_TTL_MINUTES:-30}
+      - AUTH_COOKIE_SECURE=${AUTH_COOKIE_SECURE:-false}
+      - AUTH_COOKIE_SAMESITE=${AUTH_COOKIE_SAMESITE:-lax}
+      - AUTH_COOKIE_DOMAIN=${AUTH_COOKIE_DOMAIN:-}
+      - AUTH_ENABLE_DEBUG_TOKENS=${AUTH_ENABLE_DEBUG_TOKENS:-true}
+      - AUTH_REQUIRE_LOGIN_FOR_APP=${AUTH_REQUIRE_LOGIN_FOR_APP:-true}
+      - AUTH_LOGIN_MAX_ATTEMPTS=${AUTH_LOGIN_MAX_ATTEMPTS:-5}
+      - AUTH_LOGIN_WINDOW_MINUTES=${AUTH_LOGIN_WINDOW_MINUTES:-15}
+      - AUTH_RECOVERY_MAX_ATTEMPTS=${AUTH_RECOVERY_MAX_ATTEMPTS:-5}
+      - AUTH_RECOVERY_WINDOW_MINUTES=${AUTH_RECOVERY_WINDOW_MINUTES:-15}
+      - AUTH_EMAIL_SEND_ENABLED=${AUTH_EMAIL_SEND_ENABLED:-false}
+      - AUTH_EMAIL_SMTP_HOST=${AUTH_EMAIL_SMTP_HOST:-smtp.gmail.com}
+      - AUTH_EMAIL_SMTP_PORT=${AUTH_EMAIL_SMTP_PORT:-587}
+      - AUTH_EMAIL_SMTP_USER=${AUTH_EMAIL_SMTP_USER:-}
+      - AUTH_EMAIL_SMTP_PASS=${AUTH_EMAIL_SMTP_PASS:-}
+      - AUTH_EMAIL_SMTP_SENDER=${AUTH_EMAIL_SMTP_SENDER:-no-reply@example.com}
+      - AUTH_EMAIL_SMTP_USE_TLS=${AUTH_EMAIL_SMTP_USE_TLS:-true}
+      - AUTH_EMAIL_SMTP_USE_SSL=${AUTH_EMAIL_SMTP_USE_SSL:-false}
+      - AUTH_EMAIL_TIMEOUT_SECONDS=${AUTH_EMAIL_TIMEOUT_SECONDS:-15}
+      - AUTH_EMAIL_VERIFY_URL_TEMPLATE=${AUTH_EMAIL_VERIFY_URL_TEMPLATE:-http://localhost:${FRONTEND_HOST_PORT:-5174}/?verify_token={token}}
+      - AUTH_EMAIL_RESET_URL_TEMPLATE=${AUTH_EMAIL_RESET_URL_TEMPLATE:-http://localhost:${FRONTEND_HOST_PORT:-5174}/?reset_token={token}}
+      - SECURITY_CSRF_ENABLED=${SECURITY_CSRF_ENABLED:-true}
+      - SECURITY_HEADERS_ENABLED=${SECURITY_HEADERS_ENABLED:-true}
+      - SECURITY_HSTS_ENABLED=${SECURITY_HSTS_ENABLED:-false}
+      - CORS_ALLOW_ORIGINS=${CORS_ALLOW_ORIGINS:-http://localhost:${FRONTEND_HOST_PORT:-5174}}
+      - CORS_ALLOW_CREDENTIALS=${CORS_ALLOW_CREDENTIALS:-true}
+      - TIMEZONE=${TIMEZONE:-Europe/Madrid}
+      - SCRAPER_TIMEOUT_MS=${SCRAPER_TIMEOUT_MS:-35000}
+      - SCRAPER_MAX_RETRIES=${SCRAPER_MAX_RETRIES:-2}
+      - SCRAPER_USER_AGENT=${SCRAPER_USER_AGENT:-Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36}
+      - SCRAPER_ACCEPT_LANGUAGE=${SCRAPER_ACCEPT_LANGUAGE:-es-ES,es;q=0.9,en;q=0.8}
+      - SCRAPER_PROXY_SERVER=${SCRAPER_PROXY_SERVER:-}
+      - SCRAPER_PROXY_USERNAME=${SCRAPER_PROXY_USERNAME:-}
+      - SCRAPER_PROXY_PASSWORD=${SCRAPER_PROXY_PASSWORD:-}
+    depends_on:
+      - postgres
+    ports:
+      - "${BACKEND_HOST_PORT:-8001}:8000"
+
+  frontend:
+    build:
+      context: ./front
+    restart: always
+    environment:
+      - APP_ENV=${APP_ENV:-dev}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:${BACKEND_HOST_PORT:-8001}}
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_HOST_PORT:-5174}:5173"
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    ports:
+      - "${N8N_HOST_PORT:-5679}:5678"
+    environment:
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - NODE_ENV=production
+      - GENERIC_TIMEZONE=${TIMEZONE:-Europe/Madrid}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-replace-me}
+      - N8N_EMAIL_MODE=smtp
+      - N8N_SMTP_HOST=${N8N_SMTP_HOST:-smtp.gmail.com}
+      - N8N_SMTP_PORT=${N8N_SMTP_PORT:-587}
+      - N8N_SMTP_USER=${N8N_SMTP_USER:-}
+      - N8N_SMTP_PASS=${N8N_SMTP_PASS:-}
+      - N8N_SMTP_SENDER=${N8N_SMTP_SENDER:-}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-change-this-key}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=${N8N_DB_NAME:-n8n}
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=${POSTGRES_USER:-admin}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD:-supersecreto}
+      # Deshabilita autenticacion de n8n (MVP single-user sin login)
+      - N8N_AUTH_EXCLUDE_ENDPOINTS=healthz
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+      - N8N_ADMIN_EMAIL=${N8N_ADMIN_EMAIL:-admin@pricetracker.local}
+      - N8N_ADMIN_PASSWORD=${N8N_ADMIN_PASSWORD:-Admin1234!}
+      # Permite cookies sobre HTTP (necesario para init.sh en entorno local)
+      - N8N_SECURE_COOKIE=false
+    volumes:
+      - n8n_storage:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+      - ./n8n/init.sh:/init.sh:ro
+    entrypoint: sh /init.sh
+    depends_on:
+      - postgres
+      - backend

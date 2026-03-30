@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find 'c:\\\\Users\\\\samue\\\\Documents\\\\Visual Studio\\\\atmospheric-analyst---price-tracker' -type f -name docker-compose.yml -o -name .env* -o -type d -name n8n)",
+      "Bash(docker compose:*)",
+      "Bash(docker run:*)",
+      "Bash(curl -s -X POST http://localhost:5679/rest/auth/login -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"admin@pricetracker.local\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"Admin1234!\"\"\"\"}')",
+      "Bash(curl -sv http://localhost:5679/rest/settings)",
+      "Bash(curl -s http://localhost:5679/rest/settings)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\(''''data'''',{}\\).get\\(''''userManagement'''',{}\\), indent=2\\)\\)\")",
+      "Bash(curl -sv -X POST http://localhost:5679/rest/owner/setup -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"admin@pricetracker.local\"\"\"\",\"\"\"\"firstName\"\"\"\":\"\"\"\"Admin\"\"\"\",\"\"\"\"lastName\"\"\"\":\"\"\"\"PriceTracker\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"Admin1234!\"\"\"\",\"\"\"\"agree\"\"\"\":true}')",
+      "Bash(curl -s -X POST http://localhost:5679/rest/owner/setup -H \"Content-Type: application/json\" -d '{\"\"email\"\":\"\"admin@pricetracker.local\"\",\"\"firstName\"\":\"\"Admin\"\",\"\"lastName\"\":\"\"PriceTracker\"\",\"\"password\"\":\"\"Admin1234!\"\",\"\"agree\"\":true}')",
+      "Bash(curl -s http://localhost:5679/rest/owner/setup)",
+      "Bash(curl -sv -X POST \"http://localhost:5679/rest/owner/setup\" -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"admin@pricetracker.local\"\"\"\",\"\"\"\"firstName\"\"\"\":\"\"\"\"Admin\"\"\"\",\"\"\"\"lastName\"\"\"\":\"\"\"\"PriceTracker\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"Admin1234!\"\"\"\"}')",
+      "Bash(curl -sv -X POST \"http://localhost:5679/rest/auth/email/login\" -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"admin@pricetracker.local\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"Admin1234!\"\"\"\"}')",
+      "Bash(curl -sv -X POST \"http://localhost:5679/rest/users/login\" -H \"Content-Type: application/json\" -d '{\"\"\"\"email\"\"\"\":\"\"\"\"admin@pricetracker.local\"\"\"\",\"\"\"\"password\"\"\"\":\"\"\"\"Admin1234!\"\"\"\"}')",
+      "Bash(docker exec:*)",
+      "Bash(docker volume:*)",
+      "Bash(docker stop:*)",
+      "Bash(docker rm:*)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")"
+    ]
+  }
+}
