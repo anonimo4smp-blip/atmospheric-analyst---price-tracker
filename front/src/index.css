@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-manrope: "Manrope", sans-serif;
   --font-inter: "Inter", sans-serif;
@@ -20,11 +22,40 @@
   --color-outline-variant: #acb3b7;
 
   --animate-spin-slow: spin 3s linear infinite;
+  --animate-slide-in: slide-in 0.2s ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @layer base {
   body {
     @apply bg-surface text-on-surface font-inter;
+  }
+
+  .dark {
+    --color-primary: #58a6ff;
+    --color-primary-container: #79b8ff;
+    --color-surface: #0d1117;
+    --color-surface-container-low: #161b22;
+    --color-surface-container-lowest: #1c2128;
+    --color-surface-container-high: #2d333b;
+    --color-surface-container-highest: #373e47;
+    --color-on-surface: #e6edf3;
+    --color-on-surface-variant: #8b949e;
+    --color-tertiary-container: #d4820a;
+    --color-on-tertiary-container: #ffe8b0;
+    --color-error: #f85149;
+    --color-on-error: #ffffff;
+    --color-outline-variant: #30363d;
   }
 }
 
@@ -32,7 +63,15 @@
   background: linear-gradient(135deg, #0053dc 0%, #3e76fe 100%);
 }
 
+.dark .primary-gradient {
+  background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%);
+}
+
 .glass-panel {
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
+}
+
+.dark .glass-panel {
+  background: rgba(28, 33, 40, 0.85);
 }

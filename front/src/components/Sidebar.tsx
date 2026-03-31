@@ -11,21 +11,22 @@ import {
 } from 'lucide-react';
 import {cn} from '../lib/utils';
 
-export type SidebarPage = 'dashboard' | 'alerts';
+export type SidebarPage = 'dashboard' | 'alerts' | 'settings';
 
 interface SidebarProps {
   userEmail?: string | null;
   activePage?: SidebarPage;
+  alertsBadge?: number;
   onNavigate?: (page: SidebarPage) => void;
   onLogout?: () => void;
 }
 
-export function Sidebar({userEmail, activePage = 'dashboard', onNavigate, onLogout}: SidebarProps) {
-  const navItems: {icon: React.ElementType; label: string; page: SidebarPage | null}[] = [
+export function Sidebar({userEmail, activePage = 'dashboard', alertsBadge, onNavigate, onLogout}: SidebarProps) {
+  const navItems: {icon: React.ElementType; label: string; page: SidebarPage; badge?: number}[] = [
     {icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard'},
     {icon: Package, label: 'Tracked Products', page: 'dashboard'},
-    {icon: Bell, label: 'Alerts', page: 'alerts'},
-    {icon: Settings, label: 'Settings', page: null},
+    {icon: Bell, label: 'Alerts', page: 'alerts', badge: alertsBadge},
+    {icon: Settings, label: 'Settings', page: 'settings'},
   ];
 
   return (
@@ -42,23 +43,25 @@ export function Sidebar({userEmail, activePage = 'dashboard', onNavigate, onLogo
 
       <nav className="flex-1 space-y-2">
         {navItems.map((item) => {
-          const isActive = item.page !== null && item.page === activePage;
+          const isActive = item.page === activePage;
           return (
             <button
               key={item.label}
-              onClick={() => item.page && onNavigate?.(item.page)}
-              disabled={item.page === null}
+              onClick={() => onNavigate?.(item.page)}
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-semibold',
                 isActive
-                  ? 'bg-white text-primary shadow-sm'
-                  : item.page === null
-                    ? 'text-on-surface-variant/40 cursor-not-allowed'
-                    : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface',
+                  ? 'bg-surface-container-lowest text-primary shadow-sm'
+                  : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface',
               )}
             >
               <item.icon size={20} />
-              <span>{item.label}</span>
+              <span className="flex-1 text-left">{item.label}</span>
+              {item.badge != null && item.badge > 0 && (
+                <span className="ml-auto bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-tight">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
             </button>
           );
         })}

@@ -1,5 +1,5 @@
 import React, {useState} from 'react';
-import {X, ExternalLink, Edit3, Trash2, Loader2} from 'lucide-react';
+import {X, ExternalLink, Edit3, Trash2, Loader2, RefreshCw} from 'lucide-react';
 import {PriceChart} from './PriceChart';
 import {PriceHistoryPoint, Product} from '../types';
 
@@ -9,9 +9,11 @@ interface DetailsPanelProps {
   historyLoading: boolean;
   deleting: boolean;
   savingEdit: boolean;
+  checkingProduct: boolean;
   onClose: () => void;
   onDelete: (product: Product) => void;
   onEditAlert: (newPrice: number) => Promise<void>;
+  onCheckNow: () => Promise<void>;
 }
 
 export function DetailsPanel({
@@ -20,9 +22,11 @@ export function DetailsPanel({
   historyLoading,
   deleting,
   savingEdit,
+  checkingProduct,
   onClose,
   onDelete,
   onEditAlert,
+  onCheckNow,
 }: DetailsPanelProps) {
   const [editMode, setEditMode] = useState(false);
   const [editPriceInput, setEditPriceInput] = useState('');
@@ -62,7 +66,7 @@ export function DetailsPanel({
       </div>
 
       <div className="mb-10 text-center">
-        <div className="w-full aspect-square bg-white rounded-3xl p-6 shadow-sm mb-6 flex items-center justify-center">
+        <div className="w-full aspect-square bg-surface-container-lowest rounded-3xl p-6 shadow-sm mb-6 flex items-center justify-center">
           <img
             src={product.imageUrl}
             alt={product.name}
@@ -85,7 +89,7 @@ export function DetailsPanel({
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-10">
-        <div className="bg-white p-4 rounded-2xl shadow-sm">
+        <div className="bg-surface-container-lowest p-4 rounded-2xl shadow-sm">
           <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">
             Current Price
           </span>
@@ -95,7 +99,7 @@ export function DetailsPanel({
               : `${product.currentPrice.toFixed(2)} ${product.currency}`}
           </div>
         </div>
-        <div className="bg-white p-4 rounded-2xl shadow-sm">
+        <div className="bg-surface-container-lowest p-4 rounded-2xl shadow-sm">
           <span className="text-[10px] font-bold text-on-surface-variant uppercase block mb-1">
             Target Price
           </span>
@@ -120,7 +124,7 @@ export function DetailsPanel({
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-3xl shadow-sm mb-8">
+      <div className="bg-surface-container-lowest p-6 rounded-3xl shadow-sm mb-8">
         <div className="flex items-center justify-between mb-6">
           <span className="text-xs font-bold text-on-surface uppercase tracking-wider">
             Price History
@@ -147,13 +151,21 @@ export function DetailsPanel({
           <ExternalLink size={18} />
           View on Store
         </a>
+        <button
+          onClick={onCheckNow}
+          disabled={checkingProduct}
+          className="w-full bg-primary/10 text-primary font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-primary/20 transition-colors disabled:opacity-60"
+        >
+          {checkingProduct ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
+          {checkingProduct ? 'Checking...' : 'Check price now'}
+        </button>
         <div className="flex gap-3">
           {editMode ? (
             <>
               <button
                 onClick={cancelEdit}
                 disabled={savingEdit}
-                className="flex-1 bg-white border border-outline-variant/30 text-on-surface-variant font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-surface-container transition-colors disabled:opacity-60"
+                className="flex-1 bg-surface-container-lowest border border-outline-variant/30 text-on-surface-variant font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-surface-container transition-colors disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -169,7 +181,7 @@ export function DetailsPanel({
           ) : (
           <button
             onClick={enterEdit}
-            className="flex-1 bg-white border border-outline-variant/30 text-on-surface font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-surface-container transition-colors"
+            className="flex-1 bg-surface-container-lowest border border-outline-variant/30 text-on-surface font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-surface-container transition-colors"
           >
             <Edit3 size={18} className="text-on-surface-variant" />
             Edit Alert
@@ -178,7 +190,7 @@ export function DetailsPanel({
           <button
             onClick={() => onDelete(product)}
             disabled={deleting}
-            className="flex-1 bg-white border border-error/20 text-error font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-error/5 transition-colors disabled:opacity-70"
+            className="flex-1 bg-surface-container-lowest border border-error/20 text-error font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-error/5 transition-colors disabled:opacity-70"
           >
             {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
             Remove

@@ -1,11 +1,34 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState, Component} from 'react';
+
+class PageErrorBoundary extends Component<
+  {children: React.ReactNode; pageName: string},
+  {error: Error | null}
+> {
+  constructor(props: {children: React.ReactNode; pageName: string}) {
+    super(props);
+    this.state = {error: null};
+  }
+  static getDerivedStateFromError(error: Error) {
+    return {error};
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-red-700">
+          <p className="font-bold mb-2">Error al cargar {this.props.pageName}</p>
+          <pre className="text-xs whitespace-pre-wrap">{this.state.error.message}</pre>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import {
   BarChart3,
   Activity,
   AlertTriangle,
   PlusCircle,
   Filter,
-  LayoutGrid,
   Loader2,
   RefreshCw,
   LineChart,
@@ -19,6 +42,8 @@ import {KPICard} from './components/KPICard';
 import {ProductCard} from './components/ProductCard';
 import {DetailsPanel} from './components/DetailsPanel';
 import {AlertsView} from './components/AlertsView';
+import {SettingsView} from './components/SettingsView';
+import {ToastContainer, Toast} from './components/ToastContainer';
 import {DEFAULT_PRODUCT_IMAGE} from './constants';
 import {
   ApiAlert,
@@ -114,6 +139,7 @@ function mapProduct(product: ApiProduct): Product {
     store: toUiStore(product.store),
     status,
     currentPrice: product.last_price,
+    previousPrice: product.previous_price,
     targetPrice: product.desired_price,
     imageUrl: product.image_url || DEFAULT_PRODUCT_IMAGE,
     trackingSince: formatDateLabel(product.created_at),
@@ -140,7 +166,27 @@ function getErrorMessage(error: unknown): string {
   return 'Unexpected error while calling backend.';
 }
 
-async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+let refreshTokenPromise: Promise<boolean> | null = null;
+
+async function tryRefreshToken(): Promise<boolean> {
+  if (refreshTokenPromise) return refreshTokenPromise;
+  refreshTokenPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshTokenPromise = null;
+    }
+  })();
+  return refreshTokenPromise;
+}
+
+async function apiRequest<T>(path: string, init: RequestInit = {}, skipRefresh = false): Promise<T> {
   const headers = new Headers(init.headers || {});
 
   if (init.body && !headers.has('Content-Type')) {
@@ -157,6 +203,13 @@ async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers,
     credentials: 'include',
   });
+
+  if (response.status === 401 && !skipRefresh) {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      return apiRequest<T>(path, init, true);
+    }
+  }
 
   if (response.status === 204) {
     return undefined as T;
@@ -213,18 +266,31 @@ export default function App() {
   const [targetPriceInput, setTargetPriceInput] = useState('');
 
   const [productsLoading, setProductsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [savingProduct, setSavingProduct] = useState(false);
   const [runningCheck, setRunningCheck] = useState(false);
   const [deletingProduct, setDeletingProduct] = useState(false);
   const [savingEditAlert, setSavingEditAlert] = useState(false);
+  const [checkingProduct, setCheckingProduct] = useState(false);
 
   const [page, setPage] = useState<SidebarPage>('dashboard');
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [alerts, setAlerts] = useState<ApiAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
+  const [pendingAlertsCount, setPendingAlertsCount] = useState(0);
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastCounter = React.useRef(0);
+
+  const addToast = React.useCallback((type: Toast['type'], message: string) => {
+    const id = ++toastCounter.current;
+    setToasts((prev) => [...prev, {id, type, message}]);
+  }, []);
+
+  const dismissToast = React.useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const resetDashboardData = useCallback(() => {
     setProducts([]);
@@ -232,10 +298,10 @@ export default function App() {
     setHistoryByProduct({});
     setUrlInput('');
     setTargetPriceInput('');
-    setErrorMessage(null);
-    setInfoMessage(null);
+    setToasts([]);
     setPage('dashboard');
     setAlerts([]);
+    setPendingAlertsCount(0);
   }, []);
 
   const switchAuthView = (nextView: AuthView) => {
@@ -263,7 +329,7 @@ export default function App() {
         forceLoginScreen('La sesion expiro. Inicia sesion de nuevo.');
         return;
       }
-      setErrorMessage(getErrorMessage(error) || fallbackMessage);
+      addToast('error', getErrorMessage(error) || fallbackMessage);
     },
     [forceLoginScreen],
   );
@@ -272,6 +338,14 @@ export default function App() {
     () => products.find((product) => product.id === selectedProductId) || null,
     [products, selectedProductId],
   );
+
+  const filteredProducts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return products;
+    return products.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.store.toLowerCase().includes(q),
+    );
+  }, [products, searchQuery]);
 
   const selectedHistory = selectedProduct ? historyByProduct[selectedProduct.id] || [] : [];
 
@@ -330,7 +404,6 @@ export default function App() {
     let cancelled = false;
     const bootstrap = async () => {
       setProductsLoading(true);
-      setErrorMessage(null);
       try {
         await refreshProducts();
       } catch (error) {
@@ -348,6 +421,19 @@ export default function App() {
       cancelled = true;
     };
   }, [authStatus, handleProtectedError, refreshProducts]);
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return;
+    let cancelled = false;
+    apiRequest<ApiAlert[]>('/api/alerts')
+      .then((data) => {
+        if (!cancelled) setPendingAlertsCount(data.filter((a) => a.status === 'pending').length);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [authStatus]);
 
   useEffect(() => {
     if (authStatus !== 'authenticated' || selectedProductId === null) {
@@ -372,7 +458,7 @@ export default function App() {
             forceLoginScreen('La sesion expiro. Inicia sesion de nuevo.');
             return;
           }
-          setErrorMessage(getErrorMessage(error));
+          addToast('error', getErrorMessage(error));
           setHistoryByProduct((current) => ({
             ...current,
             [selectedProductId]: [],
@@ -392,24 +478,44 @@ export default function App() {
   }, [authStatus, forceLoginScreen, selectedProductId]);
 
   useEffect(() => {
+    document.documentElement.classList.toggle('dark', darkMode);
+    localStorage.setItem('darkMode', String(darkMode));
+  }, [darkMode]);
+
+  const toggleDarkMode = useCallback(() => setDarkMode((d) => !d), []);
+
+  const fetchAlerts = useCallback(async () => {
+    setAlertsLoading(true);
+    try {
+      const data = await apiRequest<ApiAlert[]>('/api/alerts');
+      setAlerts(data);
+      setPendingAlertsCount(data.filter((a) => a.status === 'pending').length);
+    } catch (error) {
+      handleProtectedError(error, 'No se pudieron cargar las alertas.');
+    } finally {
+      setAlertsLoading(false);
+    }
+  }, [handleProtectedError]);
+
+  useEffect(() => {
     if (authStatus !== 'authenticated' || page !== 'alerts') return;
-    let cancelled = false;
-    const loadAlerts = async () => {
-      setAlertsLoading(true);
-      try {
-        const data = await apiRequest<ApiAlert[]>('/api/alerts');
-        if (!cancelled) setAlerts(data);
-      } catch (error) {
-        if (!cancelled) handleProtectedError(error, 'No se pudieron cargar las alertas.');
-      } finally {
-        if (!cancelled) setAlertsLoading(false);
-      }
-    };
-    void loadAlerts();
-    return () => {
-      cancelled = true;
-    };
-  }, [authStatus, page, handleProtectedError]);
+    void fetchAlerts();
+  }, [authStatus, page, fetchAlerts]);
+
+  const handleChangePassword = useCallback(async (currentPwd: string, newPwd: string) => {
+    await apiRequest<{message: string}>('/api/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({current_password: currentPwd, new_password: newPwd}),
+    });
+    addToast('info', 'Contraseña actualizada correctamente.');
+  }, [addToast]);
+
+  const handleRevokeOtherSessions = useCallback(async () => {
+    const res = await apiRequest<{message: string; revoked_count: number}>('/api/auth/sessions/revoke-others', {
+      method: 'POST',
+    });
+    addToast('info', `Sesiones cerradas: ${res.revoked_count}.`);
+  }, [addToast]);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -432,7 +538,7 @@ export default function App() {
       setAuthUser(loginResponse.user);
       setAuthStatus('authenticated');
       setLoginPassword('');
-      setInfoMessage(`Sesion iniciada como ${loginResponse.user.email}.`);
+      addToast('info', `Sesion iniciada como ${loginResponse.user.email}.`);
     } catch (error) {
       setLoginError(getErrorMessage(error));
     } finally {
@@ -546,17 +652,15 @@ export default function App() {
     const parsedPrice = Number.parseFloat(targetPriceInput);
 
     if (!trimmedUrl) {
-      setErrorMessage('Product URL is required.');
+      addToast('error', 'Product URL is required.');
       return;
     }
     if (!Number.isFinite(parsedPrice) || parsedPrice <= 0) {
-      setErrorMessage('Target price must be greater than zero.');
+      addToast('error', 'Target price must be greater than zero.');
       return;
     }
 
     setSavingProduct(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
     try {
       const createdProduct = await apiRequest<ApiProduct>('/api/products', {
         method: 'POST',
@@ -574,7 +678,7 @@ export default function App() {
       });
       setUrlInput('');
       setTargetPriceInput('');
-      setInfoMessage('Product saved successfully.');
+      addToast('info', 'Product saved successfully.');
     } catch (error) {
       handleProtectedError(error, 'No se pudo guardar el producto.');
     } finally {
@@ -584,8 +688,6 @@ export default function App() {
 
   const handleCheckNow = async () => {
     setRunningCheck(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
     try {
       const summary = await apiRequest<ApiCheckNowSummary>('/api/jobs/check-now', {
         method: 'POST',
@@ -598,7 +700,7 @@ export default function App() {
           return next;
         });
       }
-      setInfoMessage(
+      addToast('info',
         `Check finished. OK: ${summary.checked_ok}, Failed: ${summary.checked_failed}, Alerts: ${summary.alerts_created}`,
       );
     } catch (error) {
@@ -611,7 +713,6 @@ export default function App() {
   const handleEditAlert = async (newPrice: number) => {
     if (!selectedProduct) return;
     setSavingEditAlert(true);
-    setErrorMessage(null);
     try {
       await apiRequest<ApiProduct>('/api/products', {
         method: 'POST',
@@ -621,11 +722,36 @@ export default function App() {
         }),
       });
       await refreshProducts(selectedProduct.id);
-      setInfoMessage('Target price updated.');
+      addToast('info', 'Target price updated.');
     } catch (error) {
       handleProtectedError(error, 'No se pudo actualizar el precio objetivo.');
     } finally {
       setSavingEditAlert(false);
+    }
+  };
+
+  const handleCheckProduct = async () => {
+    if (!selectedProduct) return;
+    setCheckingProduct(true);
+    try {
+      const summary = await apiRequest<ApiCheckNowSummary>(`/api/products/${selectedProduct.id}/check`, {
+        method: 'POST',
+      });
+      await refreshProducts(selectedProduct.id);
+      setHistoryByProduct((current) => {
+        const next = {...current};
+        delete next[selectedProduct.id];
+        return next;
+      });
+      addToast('info',
+        summary.alerts_created > 0
+          ? `Price checked. Alert created — target reached!`
+          : `Price checked. OK: ${summary.checked_ok}, Failed: ${summary.checked_failed}.`,
+      );
+    } catch (error) {
+      handleProtectedError(error, 'No se pudo comprobar el precio.');
+    } finally {
+      setCheckingProduct(false);
     }
   };
 
@@ -635,8 +761,6 @@ export default function App() {
     }
 
     setDeletingProduct(true);
-    setErrorMessage(null);
-    setInfoMessage(null);
     try {
       await apiRequest<void>(`/api/products/${product.id}`, {method: 'DELETE'});
       setHistoryByProduct((current) => {
@@ -645,7 +769,7 @@ export default function App() {
         return next;
       });
       await refreshProducts();
-      setInfoMessage('Product removed successfully.');
+      addToast('info', 'Product removed successfully.');
     } catch (error) {
       handleProtectedError(error, 'No se pudo eliminar el producto.');
     } finally {
@@ -743,7 +867,7 @@ export default function App() {
                   autoComplete="email"
                   value={loginEmail}
                   onChange={(event) => setLoginEmail(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                   placeholder="tu@email.com"
                 />
               </div>
@@ -756,7 +880,7 @@ export default function App() {
                   autoComplete="current-password"
                   value={loginPassword}
                   onChange={(event) => setLoginPassword(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                   placeholder="********"
                 />
               </div>
@@ -782,7 +906,7 @@ export default function App() {
                   autoComplete="email"
                   value={registerEmail}
                   onChange={(event) => setRegisterEmail(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                   placeholder="tu@email.com"
                 />
               </div>
@@ -795,7 +919,7 @@ export default function App() {
                   autoComplete="new-password"
                   value={registerPassword}
                   onChange={(event) => setRegisterPassword(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                   placeholder="************"
                 />
               </div>
@@ -808,7 +932,7 @@ export default function App() {
                   autoComplete="new-password"
                   value={registerConfirmPassword}
                   onChange={(event) => setRegisterConfirmPassword(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                   placeholder="************"
                 />
               </div>
@@ -842,7 +966,7 @@ export default function App() {
                   type="text"
                   value={verifyToken}
                   onChange={(event) => setVerifyToken(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                  className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
                   placeholder="Pega aqui el token"
                 />
               </div>
@@ -885,27 +1009,55 @@ export default function App() {
       <Sidebar
         userEmail={authUser?.email}
         activePage={page}
+        alertsBadge={pendingAlertsCount}
         onNavigate={setPage}
         onLogout={handleLogout}
       />
 
       <main className={`ml-64 p-8 ${page === 'dashboard' ? 'mr-[400px]' : 'mr-0'}`}>
-        {page === 'alerts' ? (
+        {page === 'settings' ? (
           <>
             <header className="mb-10">
               <h2 className="font-manrope text-3xl font-extrabold text-on-surface tracking-tight mb-2">
-                Alerts History
+                Settings
               </h2>
               <p className="text-on-surface-variant font-medium">
-                Price drop notifications triggered for your tracked products.
+                Manage your account and security preferences.
               </p>
             </header>
-            {errorMessage && (
-              <div className="mb-6 rounded-xl border border-error/20 bg-error/5 text-error px-4 py-3 text-sm font-semibold">
-                {errorMessage}
+            <PageErrorBoundary pageName="Settings">
+              <SettingsView
+                userEmail={authUser?.email ?? ''}
+                darkMode={darkMode}
+                onToggleDark={toggleDarkMode}
+                onChangePassword={handleChangePassword}
+                onRevokeOtherSessions={handleRevokeOtherSessions}
+              />
+            </PageErrorBoundary>
+          </>
+        ) : page === 'alerts' ? (
+          <>
+            <header className="mb-10">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-manrope text-3xl font-extrabold text-on-surface tracking-tight mb-2">
+                    Alerts History
+                  </h2>
+                  <p className="text-on-surface-variant font-medium">
+                    Price drop notifications triggered for your tracked products.
+                  </p>
+                </div>
+                <button
+                  onClick={() => void fetchAlerts()}
+                  disabled={alertsLoading}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-high text-on-surface text-sm font-semibold hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+                >
+                  <RefreshCw size={14} className={alertsLoading ? 'animate-spin' : ''} />
+                  Refresh
+                </button>
               </div>
-            )}
-            <AlertsView alerts={alerts} loading={alertsLoading} />
+            </header>
+            <AlertsView alerts={alerts} loading={alertsLoading} onRefresh={() => void fetchAlerts()} />
           </>
         ) : (
         <>
@@ -929,17 +1081,6 @@ export default function App() {
             </button>
           </div>
         </header>
-
-        {errorMessage && (
-          <div className="mb-6 rounded-xl border border-error/20 bg-error/5 text-error px-4 py-3 text-sm font-semibold">
-            {errorMessage}
-          </div>
-        )}
-        {infoMessage && (
-          <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 text-primary px-4 py-3 text-sm font-semibold">
-            {infoMessage}
-          </div>
-        )}
 
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           <KPICard
@@ -980,7 +1121,7 @@ export default function App() {
                 value={urlInput}
                 onChange={(event) => setUrlInput(event.target.value)}
                 placeholder="https://amazon.es/dp/..."
-                className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
               />
             </div>
             <div className="w-full md:w-48">
@@ -994,7 +1135,7 @@ export default function App() {
                 value={targetPriceInput}
                 onChange={(event) => setTargetPriceInput(event.target.value)}
                 placeholder="0.00"
-                className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-white focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                className="w-full h-12 px-4 rounded-xl border-none bg-surface-container-highest focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
               />
             </div>
             <div className="flex items-end">
@@ -1011,23 +1152,34 @@ export default function App() {
         </section>
 
         <section>
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h3 className="font-manrope text-xl font-extrabold tracking-tight">Active Monitors</h3>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className="p-2 rounded-lg bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
-              >
-                <Filter size={18} />
-              </button>
-              <button
-                type="button"
-                className="p-2 rounded-lg bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest transition-colors"
-              >
-                <LayoutGrid size={18} />
-              </button>
-            </div>
+            <span className="text-xs font-semibold text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">
+              {filteredProducts.length}{searchQuery ? ` / ${products.length}` : ''}
+            </span>
           </div>
+
+          {products.length > 0 && (
+            <div className="relative mb-5">
+              <Filter size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name or store…"
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-surface-container-high border-none text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors text-xs font-bold"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
 
           {productsLoading ? (
             <div className="bg-surface-container-lowest rounded-2xl p-8 text-on-surface-variant font-semibold flex items-center gap-3">
@@ -1050,9 +1202,24 @@ export default function App() {
                 Add your first product to get started
               </div>
             </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="bg-surface-container-lowest rounded-2xl p-8 flex flex-col items-center gap-3 text-center">
+              <Filter size={28} className="text-on-surface-variant/40" />
+              <div>
+                <p className="font-bold text-on-surface text-sm">No results for "{searchQuery}"</p>
+                <p className="text-xs text-on-surface-variant mt-0.5">Try a different name or store.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="text-xs font-bold text-primary hover:underline"
+              >
+                Clear search
+              </button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {products.map((product) => (
+              {filteredProducts.map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}
@@ -1073,10 +1240,13 @@ export default function App() {
         historyLoading={historyLoading}
         deleting={deletingProduct}
         savingEdit={savingEditAlert}
+        checkingProduct={checkingProduct}
         onClose={() => setSelectedProductId(null)}
         onDelete={handleDeleteProduct}
         onEditAlert={handleEditAlert}
+        onCheckNow={handleCheckProduct}
       />
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }

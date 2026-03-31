@@ -1,5 +1,5 @@
 import React from 'react';
-import {AlertCircle, RefreshCw} from 'lucide-react';
+import {AlertCircle, RefreshCw, TrendingDown, TrendingUp} from 'lucide-react';
 import {cn} from '../lib/utils';
 import {Product} from '../types';
 
@@ -8,6 +8,25 @@ interface ProductCardProps {
   product: Product;
   isSelected?: boolean;
   onClick?: () => void;
+}
+
+function TrendBadge({current, previous}: {current: number; previous: number}) {
+  const pct = ((current - previous) / previous) * 100;
+  if (Math.abs(pct) < 0.05) return null;
+  const down = pct < 0;
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+        down
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+      )}
+    >
+      {down ? <TrendingDown size={10} /> : <TrendingUp size={10} />}
+      {Math.abs(pct).toFixed(1)}%
+    </span>
+  );
 }
 
 export function ProductCard({product, isSelected, onClick}: ProductCardProps) {
@@ -91,7 +110,7 @@ export function ProductCard({product, isSelected, onClick}: ProductCardProps) {
               {product.pendingMsg}
             </div>
           ) : (
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-2 flex-wrap">
               <span className={cn('text-xl font-extrabold', isAlert && 'text-tertiary-container')}>
                 {product.currentPrice === null
                   ? 'N/A'
@@ -102,6 +121,10 @@ export function ProductCard({product, isSelected, onClick}: ProductCardProps) {
                   {product.originalPrice.toFixed(2)} {product.currency}
                 </span>
               )}
+              {typeof product.currentPrice === 'number' &&
+                typeof product.previousPrice === 'number' && (
+                  <TrendBadge current={product.currentPrice} previous={product.previousPrice} />
+                )}
             </div>
           )}
         </div>

@@ -7,6 +7,7 @@ export interface Product {
   store: string;
   status: ProductStatus;
   currentPrice: number | null;
+  previousPrice?: number | null;
   originalPrice?: number;
   targetPrice: number;
   imageUrl: string;
@@ -30,6 +31,7 @@ export interface ApiProduct {
   image_url: string | null;
   desired_price: number;
   last_price: number | null;
+  previous_price: number | null;
   currency: string;
   last_status: string;
   last_error: string | null;

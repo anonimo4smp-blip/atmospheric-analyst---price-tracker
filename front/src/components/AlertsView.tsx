@@ -1,10 +1,11 @@
 import React from 'react';
-import {Bell, Loader2, CheckCircle2, Clock, AlertTriangle, ExternalLink} from 'lucide-react';
+import {Bell, Loader2, CheckCircle2, Clock, AlertTriangle, ExternalLink, RefreshCw} from 'lucide-react';
 import {ApiAlert} from '../types';
 
 interface AlertsViewProps {
   alerts: ApiAlert[];
   loading: boolean;
+  onRefresh: () => void;
 }
 
 function formatDateTime(iso: string): string {
@@ -22,7 +23,7 @@ function formatDateTime(iso: string): string {
 function StatusBadge({status}: {status: string}) {
   if (status === 'sent') {
     return (
-      <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+      <span className="inline-flex items-center gap-1 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
         <CheckCircle2 size={10} />
         Sent
       </span>
@@ -30,21 +31,21 @@ function StatusBadge({status}: {status: string}) {
   }
   if (status === 'pending') {
     return (
-      <span className="inline-flex items-center gap-1 bg-yellow-50 text-yellow-700 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+      <span className="inline-flex items-center gap-1 bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
         <Clock size={10} />
         Pending
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+    <span className="inline-flex items-center gap-1 bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
       <AlertTriangle size={10} />
       {status}
     </span>
   );
 }
 
-export function AlertsView({alerts, loading}: AlertsViewProps) {
+export function AlertsView({alerts, loading, onRefresh}: AlertsViewProps) {
   if (loading) {
     return (
       <div className="flex items-center gap-3 text-on-surface-variant font-semibold p-8">
@@ -66,6 +67,13 @@ export function AlertsView({alerts, loading}: AlertsViewProps) {
             Alerts will appear here when a tracked product drops to your target price.
           </p>
         </div>
+        <button
+          onClick={onRefresh}
+          className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
+        >
+          <RefreshCw size={14} />
+          Refresh
+        </button>
       </div>
     );
   }
@@ -78,7 +86,7 @@ export function AlertsView({alerts, loading}: AlertsViewProps) {
         return (
           <div
             key={alert.id}
-            className="bg-white rounded-2xl p-5 shadow-sm flex items-start justify-between gap-4"
+            className="bg-surface-container-lowest rounded-2xl p-5 shadow-sm flex items-start justify-between gap-4"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">

@@ -19,6 +19,7 @@ class ProductResponse(BaseModel):
     image_url: str | None
     desired_price: Decimal
     last_price: Decimal | None
+    previous_price: float | None = None
     currency: str
     last_status: str
     last_error: str | None
