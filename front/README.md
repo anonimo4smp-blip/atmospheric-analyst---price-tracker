@@ -1,20 +1,17 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Frontend — Atmospheric Analyst
 
-# Run and deploy your AI Studio app
+Interfaz React del price tracker. Ver instrucciones completas en el [README raíz](../README.md).
 
-This contains everything you need to run your app locally.
+## Desarrollo local (fuera de Docker)
 
-View your app in AI Studio: https://ai.studio/apps/78595db6-f8ba-4fba-bb8f-db78011769d5
+```bash
+cp .env.example .env       # edita VITE_API_BASE_URL
+npm install
+npm run dev                # http://localhost:5173
+```
 
-## Run Locally
+## Build de producción
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+```bash
+npm run build              # genera front/dist/
+```
