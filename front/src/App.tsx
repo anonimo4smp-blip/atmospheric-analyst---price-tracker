@@ -36,6 +36,7 @@ import {
   UserPlus,
   ShieldCheck,
   PackageSearch,
+  X,
 } from 'lucide-react';
 import {Sidebar, SidebarPage} from './components/Sidebar';
 import {KPICard} from './components/KPICard';
@@ -277,6 +278,7 @@ export default function App() {
 
   const [page, setPage] = useState<SidebarPage>('dashboard');
   const [showHelp, setShowHelp] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [alerts, setAlerts] = useState<ApiAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -321,6 +323,7 @@ export default function App() {
       setLoginError(message || null);
       setAuthNotice(null);
       resetDashboardData();
+      if (message) setShowAuthModal(true);
     },
     [resetDashboardData],
   );
@@ -398,7 +401,7 @@ export default function App() {
   }, [forceLoginScreen]);
 
   useEffect(() => {
-    if (authStatus !== 'authenticated') {
+    if (authStatus === 'checking') {
       setProductsLoading(false);
       return;
     }
@@ -438,7 +441,7 @@ export default function App() {
   }, [authStatus]);
 
   useEffect(() => {
-    if (authStatus !== 'authenticated' || selectedProductId === null) {
+    if (authStatus === 'checking' || selectedProductId === null) {
       return;
     }
     let cancelled = false;
@@ -540,6 +543,7 @@ export default function App() {
       setAuthUser(loginResponse.user);
       setAuthStatus('authenticated');
       setLoginPassword('');
+      setShowAuthModal(false);
       addToast('info', `Sesion iniciada como ${loginResponse.user.email}.`);
     } catch (error) {
       setLoginError(getErrorMessage(error));
@@ -606,6 +610,7 @@ export default function App() {
       setAuthView('login');
       setVerifyToken('');
       setAuthNotice(`${response.message} Ya puedes iniciar sesion.`);
+      setShowAuthModal(true);
     } catch (error) {
       setLoginError(getErrorMessage(error));
     } finally {
@@ -793,10 +798,15 @@ export default function App() {
     );
   }
 
-  if (authStatus === 'unauthenticated') {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center p-6">
-        <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-8 shadow-sm border border-outline-variant/10">
+  const authFormContent = (
+      <div className="w-full max-w-md bg-surface-container-lowest rounded-3xl p-8 shadow-sm border border-outline-variant/10 relative">
+          <button
+            onClick={() => setShowAuthModal(false)}
+            className="absolute top-4 right-4 p-2 rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+            aria-label="Cerrar"
+          >
+            <X size={18} />
+          </button>
           <div className="flex items-center gap-3 mb-8">
             <div className="w-11 h-11 rounded-xl primary-gradient flex items-center justify-center text-white shadow-lg">
               <LineChart size={24} />
@@ -1002,18 +1012,28 @@ export default function App() {
             </form>
           )}
         </div>
-      </div>
-    );
-  }
+  );
+
+  const isAuthenticated = authStatus === 'authenticated';
 
   return (
     <div className="min-h-screen bg-surface">
+      {showAuthModal && !isAuthenticated && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAuthModal(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative z-10" onClick={(e) => e.stopPropagation()}>
+            {authFormContent}
+          </div>
+        </div>
+      )}
       <Sidebar
         userEmail={authUser?.email}
+        isAuthenticated={isAuthenticated}
         activePage={page}
         alertsBadge={pendingAlertsCount}
         onNavigate={setPage}
         onHelp={() => setShowHelp(true)}
+        onShowLogin={() => { setAuthView('login'); setShowAuthModal(true); }}
         onLogout={handleLogout}
       />
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
@@ -1051,17 +1071,40 @@ export default function App() {
                     Price drop notifications triggered for your tracked products.
                   </p>
                 </div>
-                <button
-                  onClick={() => void fetchAlerts()}
-                  disabled={alertsLoading}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-high text-on-surface text-sm font-semibold hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1"
-                >
-                  <RefreshCw size={14} className={alertsLoading ? 'animate-spin' : ''} />
-                  Refresh
-                </button>
+                {isAuthenticated && (
+                  <button
+                    onClick={() => void fetchAlerts()}
+                    disabled={alertsLoading}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-high text-on-surface text-sm font-semibold hover:bg-primary/10 hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1"
+                  >
+                    <RefreshCw size={14} className={alertsLoading ? 'animate-spin' : ''} />
+                    Refresh
+                  </button>
+                )}
               </div>
             </header>
-            <AlertsView alerts={alerts} loading={alertsLoading} onRefresh={() => void fetchAlerts()} />
+            {isAuthenticated ? (
+              <AlertsView alerts={alerts} loading={alertsLoading} onRefresh={() => void fetchAlerts()} />
+            ) : (
+              <div className="bg-surface-container-lowest border border-outline-variant/20 rounded-3xl p-12 flex flex-col items-center justify-center gap-4 text-center">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <LogIn size={32} className="text-primary" />
+                </div>
+                <div>
+                  <p className="text-lg font-extrabold text-on-surface mb-1">Inicia sesión para ver las alertas</p>
+                  <p className="text-sm text-on-surface-variant font-medium">
+                    Las alertas de precio se envían por email. Necesitas una cuenta para recibirlas.
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setAuthView('login'); setShowAuthModal(true); }}
+                  className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  <LogIn size={14} />
+                  Iniciar sesión
+                </button>
+              </div>
+            )}
           </>
         ) : (
         <>

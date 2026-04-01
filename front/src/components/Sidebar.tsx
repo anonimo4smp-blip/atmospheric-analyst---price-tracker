@@ -7,6 +7,7 @@ import {
   Plus,
   LifeBuoy,
   LogOut,
+  LogIn,
   LineChart,
 } from 'lucide-react';
 import {cn} from '../lib/utils';
@@ -15,14 +16,16 @@ export type SidebarPage = 'dashboard' | 'alerts' | 'settings';
 
 interface SidebarProps {
   userEmail?: string | null;
+  isAuthenticated?: boolean;
   activePage?: SidebarPage;
   alertsBadge?: number;
   onNavigate?: (page: SidebarPage) => void;
   onHelp?: () => void;
+  onShowLogin?: () => void;
   onLogout?: () => void;
 }
 
-export function Sidebar({userEmail, activePage = 'dashboard', alertsBadge, onNavigate, onHelp, onLogout}: SidebarProps) {
+export function Sidebar({userEmail, isAuthenticated, activePage = 'dashboard', alertsBadge, onNavigate, onHelp, onShowLogin, onLogout}: SidebarProps) {
   const navItems: {icon: React.ElementType; label: string; page: SidebarPage; badge?: number}[] = [
     {icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard'},
     {icon: Package, label: 'Tracked Products', page: 'dashboard'},
@@ -75,7 +78,7 @@ export function Sidebar({userEmail, activePage = 'dashboard', alertsBadge, onNav
         </button>
 
         <div className="pt-4 border-t border-outline-variant/10 space-y-1">
-          {userEmail && (
+          {isAuthenticated && userEmail && (
             <div className="px-4 py-2 text-xs font-semibold text-on-surface-variant truncate">
               {userEmail}
             </div>
@@ -87,13 +90,23 @@ export function Sidebar({userEmail, activePage = 'dashboard', alertsBadge, onNav
             <LifeBuoy size={20} />
             <span>Help Center</span>
           </button>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all"
-          >
-            <LogOut size={20} />
-            <span>Logout</span>
-          </button>
+          {isAuthenticated ? (
+            <button
+              onClick={onLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all"
+            >
+              <LogOut size={20} />
+              <span>Logout</span>
+            </button>
+          ) : (
+            <button
+              onClick={onShowLogin}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-primary hover:bg-primary/10 transition-all"
+            >
+              <LogIn size={20} />
+              <span>Iniciar sesión</span>
+            </button>
+          )}
         </div>
       </div>
     </aside>
