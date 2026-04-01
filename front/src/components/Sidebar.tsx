@@ -18,10 +18,11 @@ interface SidebarProps {
   activePage?: SidebarPage;
   alertsBadge?: number;
   onNavigate?: (page: SidebarPage) => void;
+  onHelp?: () => void;
   onLogout?: () => void;
 }
 
-export function Sidebar({userEmail, activePage = 'dashboard', alertsBadge, onNavigate, onLogout}: SidebarProps) {
+export function Sidebar({userEmail, activePage = 'dashboard', alertsBadge, onNavigate, onHelp, onLogout}: SidebarProps) {
   const navItems: {icon: React.ElementType; label: string; page: SidebarPage; badge?: number}[] = [
     {icon: LayoutDashboard, label: 'Dashboard', page: 'dashboard'},
     {icon: Package, label: 'Tracked Products', page: 'dashboard'},
@@ -79,7 +80,10 @@ export function Sidebar({userEmail, activePage = 'dashboard', alertsBadge, onNav
               {userEmail}
             </div>
           )}
-          <button className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all">
+          <button
+            onClick={onHelp}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all"
+          >
             <LifeBuoy size={20} />
             <span>Help Center</span>
           </button>

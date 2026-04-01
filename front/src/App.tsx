@@ -43,6 +43,7 @@ import {ProductCard} from './components/ProductCard';
 import {DetailsPanel} from './components/DetailsPanel';
 import {AlertsView} from './components/AlertsView';
 import {SettingsView} from './components/SettingsView';
+import {HelpModal} from './components/HelpModal';
 import {ToastContainer, Toast} from './components/ToastContainer';
 import {DEFAULT_PRODUCT_IMAGE} from './constants';
 import {
@@ -275,6 +276,7 @@ export default function App() {
   const [checkingProduct, setCheckingProduct] = useState(false);
 
   const [page, setPage] = useState<SidebarPage>('dashboard');
+  const [showHelp, setShowHelp] = useState(false);
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [alerts, setAlerts] = useState<ApiAlert[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -1011,10 +1013,12 @@ export default function App() {
         activePage={page}
         alertsBadge={pendingAlertsCount}
         onNavigate={setPage}
+        onHelp={() => setShowHelp(true)}
         onLogout={handleLogout}
       />
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
 
-      <main className={`ml-64 p-8 ${page === 'dashboard' ? 'mr-[400px]' : 'mr-0'}`}>
+      <main className={`ml-64 p-8 transition-[margin] duration-300 ${page === 'dashboard' && selectedProduct ? 'mr-[400px]' : 'mr-0'}`}>
         {page === 'settings' ? (
           <>
             <header className="mb-10">

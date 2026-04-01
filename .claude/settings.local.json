@@ -19,7 +19,8 @@
       "Bash(docker volume:*)",
       "Bash(docker stop:*)",
       "Bash(docker rm:*)",
-      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")"
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2\\)\\)\")",
+      "Bash(npm run:*)"
     ]
   }
 }
